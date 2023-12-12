@@ -21,11 +21,11 @@ def download_audio(video_url, output_dir):
 def transcribe_audio(audio_file, job_id, model_size="small"):
     model = WhisperModel(model_size, device="cpu", compute_type="int8")
     segments, info = model.transcribe(audio_file, beam_size=5)
-    transcriptions = ["WEBVTT"]
+    transcriptions = ["WEBVTT\n"]
     for segment in segments:
         start_time = str(datetime.timedelta(seconds=segment.start))
         end_time = str(datetime.timedelta(seconds=segment.end))
-        transcript_string = f"{start_time} --> {end_time}\n{segment.text}"
+        transcript_string = f"{start_time} --> {end_time}\n{segment.text}\n"
         transcriptions.append(transcript_string)
         print(transcript_string)
         transcript_base64 = base64.b64encode('\n'.join(transcriptions).encode()).decode()
