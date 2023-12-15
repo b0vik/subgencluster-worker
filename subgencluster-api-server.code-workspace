@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "../subgencluster-api-server"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}

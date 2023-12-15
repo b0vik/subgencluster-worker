@@ -8,6 +8,13 @@ import time
 import datetime
 import os
 from icecream import ic
+from pydub import AudioSegment
+
+def get_audio_length(audio_file):
+    audio = AudioSegment.from_file(audio_file)
+    duration_in_milliseconds = len(audio)
+    duration_in_seconds = duration_in_milliseconds / 1000.0
+    return duration_in_seconds
 
 def download_audio(video_url, output_dir):
     ydl_opts = {
@@ -17,23 +24,26 @@ def download_audio(video_url, output_dir):
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
+        
 
-def transcribe_audio(audio_file, job_id, model_size="small"):
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+
+def transcribe_audio(audio_file, job_id, audio_length, model_size="small", device="cpu", compute_type="int8"):
+    model = WhisperModel(model_size, device=device, compute_type=compute_type)
     segments, info = model.transcribe(audio_file, beam_size=5)
     transcriptions = ["WEBVTT\n"]
     for segment in segments:
         start_time = str(datetime.timedelta(seconds=segment.start))
         end_time = str(datetime.timedelta(seconds=segment.end))
-        transcript_string = f"{start_time} --> {end_time}\n{segment.text}\n"
+        transcript_string = f"{start_time} --> {end_time}\n{segment.text[1:]}\n"
         transcriptions.append(transcript_string)
         print(transcript_string)
         transcript_base64 = base64.b64encode('\n'.join(transcriptions).encode()).decode()
-
+        estimated_progress = segment.end / audio_length
+        print(estimated_progress)
         requests.post('http://localhost:8080/updateJobProgress', json={
             'workerName': 'exampleWorker',
             'apiKey': 'exampleKey',
-            'progress': 50,  # Replace with your own progress estimation logic
+            'progress': estimated_progress,  # Replace with your own progress estimation logic
             'cpuLoad': get_cpu_load(),
             'workerType': 'cpu',
             'transcript': transcript_base64,
@@ -66,11 +76,10 @@ def main():
             requested_model = data.get('requestedModel')
             job_id = data.get('jobIdentifier')
 
-
             with tempfile.TemporaryDirectory() as tmp_dir:
                 download_audio(audio_url, tmp_dir)
                 for audio_file in os.listdir(tmp_dir):
-                    transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, requested_model)
+                    transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, audio_length=get_audio_length(), model_size=requested_model)
                     transcript_base64 = base64.b64encode(transcript.encode()).decode()
 
                     requests.post('http://localhost:8080/uploadCompletedJob', json={
