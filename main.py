@@ -79,7 +79,7 @@ def main():
             with tempfile.TemporaryDirectory() as tmp_dir:
                 download_audio(audio_url, tmp_dir)
                 for audio_file in os.listdir(tmp_dir):
-                    transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, audio_length=get_audio_length(), model_size=requested_model)
+                    transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, audio_length=get_audio_length(os.path.join(tmp_dir, audio_file)), model_size=requested_model)
                     transcript_base64 = base64.b64encode(transcript.encode()).decode()
 
                     requests.post('http://localhost:8080/uploadCompletedJob', json={
