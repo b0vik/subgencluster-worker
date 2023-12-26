@@ -38,24 +38,31 @@ def request_transcription(video_url):
     response = requests.post(url, json=data)
     print(response.json())
 
-def process_file(file_path, skip_prompt):
+def process_file(file_path, skip_prompt): # TODO: clean up this function
     video_urls = []
     with open(file_path, 'r') as file:
         for line in file:
             line = line.strip()
             if line:
                 if line.find("youtube.com/@"): # new-style URL; resolve
-                    url = resolve_url(line)
-                    if url and url.find("/channel/"):
-                        channel_id = url.split("/channel/")[1]
-                        videos = scrapetube.get_channel(channel_id)
-                        for video in videos:
-                            individual_video_link = f"https://www.youtube.com/watch?v={video['videoId']}"
-                            video_urls.append(individual_video_link)
-                            print(individual_video_link)
+                    line = resolve_url(line)
+                if line.find("/channel/"):
+                    channel_id = line.split("/channel/")[1]
+                    videos = scrapetube.get_channel(channel_id)
+                    for video in videos:
+                        individual_video_link = f"https://www.youtube.com/watch?v={video['videoId']}"
+                        video_urls.append(individual_video_link)
+                        print(individual_video_link)
                 elif line.find("youtube.com/watch?v="):
                     print(line)
                     video_urls.append(line)
+                elif line.find("youtube.com/playlist?list="):
+                    playlist_id = line.split("youtube.com/playlist?list=")[1]
+                    videos = scrapetube.get_playlist(playlist_id)
+                    for video in videos:
+                        individual_video_link = f"https://www.youtube.com/watch?v={video['videoId']}"
+                        video_urls.append(individual_video_link)
+                        print(individual_video_link)
 
     if not skip_prompt:
         prompt = input(f"Do you want to transcribe {len(video_urls)} videos for -1 kudos? [Y/n] ")
@@ -78,18 +85,19 @@ def convert_and_request_transcription(file_path):
         }
         response = requests.post(url, files=files, data=data)
         print(response.json())
+        
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--video-list', '-l', help='file containing YouTube video links')
+    group.add_argument('--video', '-v', help='YouTube video link')
+    group.add_argument('--file', '-f', help='file to convert to WAV and transcribe')
+    parser.add_argument('--skip-prompt', action='store_true', help='skip the prompt when using --video-list')
+    args = parser.parse_args()
 
-parser = argparse.ArgumentParser()
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument('--video-list', '-l', help='file containing YouTube video links')
-group.add_argument('--video', '-v', help='YouTube video link')
-group.add_argument('--file', '-f', help='file to convert to WAV and transcribe')
-parser.add_argument('--skip-prompt', action='store_true', help='skip the prompt when using --video-list')
-args = parser.parse_args()
-
-if args.video_list:
-    process_file(args.video_list, args.skip_prompt)
-elif args.video:
-    request_transcription(args.video)
-elif args.file:
-    convert_and_request_transcription(args.file)
+    if args.video_list:
+        process_file(args.video_list, args.skip_prompt)
+    elif args.video:
+        request_transcription(args.video)
+    elif args.file:
+        convert_and_request_transcription(args.file)
