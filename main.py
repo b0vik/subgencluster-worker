@@ -25,16 +25,14 @@ def download_audio(video_url, output_dir):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
         
-
-
 def transcribe_audio(audio_file, job_id, audio_length, model_size="small", device="cpu", compute_type="int8"):
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
     segments, info = model.transcribe(audio_file, beam_size=5)
     transcriptions = ["WEBVTT\n"]
     for segment in segments:
-        start_time = str(datetime.timedelta(seconds=segment.start))
-        end_time = str(datetime.timedelta(seconds=segment.end))
-        transcript_string = f"{start_time} --> {end_time}\n{segment.text[1:]}\n"
+        start_time = format_time(segment.start)
+        end_time = format_time(segment.end)
+        transcript_string = f"{start_time} --> {end_time}\n{segment.text[1:]}\n\n"
         transcriptions.append(transcript_string)
         print(transcript_string)
         transcript_base64 = base64.b64encode('\n'.join(transcriptions).encode()).decode()
@@ -44,12 +42,21 @@ def transcribe_audio(audio_file, job_id, audio_length, model_size="small", devic
             'workerName': 'exampleWorker',
             'apiKey': 'exampleKey',
             'progress': estimated_progress,  # Replace with your own progress estimation logic
+            'video_length': audio_length,
             'cpuLoad': get_cpu_load(),
             'workerType': 'cpu',
             'transcript': transcript_base64,
             'jobIdentifier': job_id
         })
     return '\n'.join(transcriptions)
+
+def format_time(seconds):
+    time_string = str(datetime.timedelta(seconds=seconds))
+    if '.' not in time_string:
+        time_string += '.000'
+    else:
+        time_string = time_string.split('.')[0] + '.' + time_string.split('.')[1][:3]
+    return time_string
 
 def get_cpu_load():
     return psutil.cpu_percent(interval=1)
@@ -71,7 +78,7 @@ def main():
             time.sleep(1)
             continue
 
-        if job_type == 'public-youtube-video':
+        if job_type == 'public-youtube-video' or job_type == 'file':
             audio_url = data.get('audioUrl')
             requested_model = data.get('requestedModel')
             job_id = data.get('jobIdentifier')
