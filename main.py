@@ -69,34 +69,39 @@ def main():
             'apiKey': 'exampleKey',
             'workerType': 'cpu'
         })
-
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception as e:
+            print(e)
+            print(response)
         job_type = data.get('jobType')
+        transcribe_live = data.get('transcribeLive')
 
         if job_type == 'none':
             ic("API server has nothing for us to do")
             time.sleep(1)
             continue
 
-        if job_type == 'public-youtube-video' or job_type == 'file':
-            audio_url = data.get('audioUrl')
-            requested_model = data.get('requestedModel')
-            job_id = data.get('jobIdentifier')
+        if job_type == 'public-url' or job_type == 'file':
+            if transcribe_live:
+                audio_url = data.get('audioUrl')
+                requested_model = data.get('requestedModel')
+                job_id = data.get('jobIdentifier')
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                download_audio(audio_url, tmp_dir)
-                for audio_file in os.listdir(tmp_dir):
-                    transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, audio_length=get_audio_length(os.path.join(tmp_dir, audio_file)), model_size=requested_model)
-                    transcript_base64 = base64.b64encode(transcript.encode()).decode()
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    download_audio(audio_url, tmp_dir)
+                    for audio_file in os.listdir(tmp_dir):
+                        transcript = transcribe_audio(os.path.join(tmp_dir, audio_file), job_id, audio_length=get_audio_length(os.path.join(tmp_dir, audio_file)), model_size=requested_model)
+                        transcript_base64 = base64.b64encode(transcript.encode()).decode()
 
-                    requests.post('http://localhost:8080/uploadCompletedJob', json={
-                        'workerName': 'exampleWorker',
-                        'apiKey': 'exampleKey',
-                        'cpuLoad': get_cpu_load(),
-                        'workerType': 'cpu',
-                        'transcript': transcript_base64,
-                        'jobIdentifier': job_id
-                    })
+                        requests.post('http://localhost:8080/uploadCompletedJob', json={
+                            'workerName': 'exampleWorker',
+                            'apiKey': 'exampleKey',
+                            'cpuLoad': get_cpu_load(),
+                            'workerType': 'cpu',
+                            'transcript': transcript_base64,
+                            'jobIdentifier': job_id
+                        })
         
 
 if __name__ == "__main__":
